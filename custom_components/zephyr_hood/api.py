@@ -50,13 +50,23 @@ class ZephyrApiError(Exception):
 
 
 def build_ssl_context() -> ssl.SSLContext:
-    """Verifying SSL context, tolerant of the Gemtek cert.
+    """Verifying SSL context for the Zephyr/Gemtek + AWS endpoints.
 
-    The Zephyr/Gemtek API cert is missing the Subject Key Identifier extension,
-    which Python 3.13's strict X.509 mode rejects. We keep full chain + hostname
-    verification but drop only the strict RFC checks.
+    Two quirks are handled:
+
+    * CA trust: on Home Assistant OS the system CA store does not verify the
+      Gemtek API chain, even though Cognito (via botocore's bundled certifi
+      store) does. We anchor to certifi so behaviour matches everywhere.
+    * Strict X.509: the Gemtek cert is missing the Subject Key Identifier
+      extension, which Python 3.13's strict mode rejects. We keep full chain +
+      hostname verification but drop only the strict RFC checks.
     """
-    ctx = ssl.create_default_context()
+    try:
+        import certifi
+
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # noqa: BLE001 - fall back to the system store
+        ctx = ssl.create_default_context()
     if hasattr(ssl, "VERIFY_X509_STRICT"):
         ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
     return ctx

@@ -6,7 +6,7 @@
   "issue_tracker": "https://github.com/kyooknot/zephyr-connect-ha/issues",
   "dependencies": [],
   "codeowners": ["@kyooknot"],
-  "requirements": ["pycognito>=2024.5.1", "paho-mqtt>=1.6.0"],
+  "requirements": ["pycognito>=2024.5.1", "paho-mqtt>=1.6.0", "certifi>=2024.2.2"],
   "iot_class": "cloud_push",
   "config_flow": true,
   "homeassistant": "2024.8.0"
