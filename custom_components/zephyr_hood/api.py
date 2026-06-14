@@ -83,7 +83,14 @@ class ZephyrCloud:
         self._client: mqtt.Client | None = None
         self._on_state: Callable[[str, dict[str, Any]], None] | None = None
         self._things: set[str] = set()
-        self._ssl = build_ssl_context()
+        self._ssl: ssl.SSLContext | None = None
+
+    def _ctx(self) -> ssl.SSLContext:
+        """Lazily build the SSL context. Only called from executor threads so
+        the cert-file load never blocks the event loop."""
+        if self._ssl is None:
+            self._ssl = build_ssl_context()
+        return self._ssl
 
     # ----------------------------------------------------------------- auth ----
     def authenticate(self) -> None:
@@ -122,7 +129,7 @@ class ZephyrCloud:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=20, context=self._ssl) as resp:
+        with urllib.request.urlopen(req, timeout=20, context=self._ctx()) as resp:
             return json.loads(resp.read())
 
     def _aws_credentials(self) -> dict[str, str]:
@@ -157,7 +164,7 @@ class ZephyrCloud:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=20, context=self._ssl) as resp:
+            with urllib.request.urlopen(req, timeout=20, context=self._ctx()) as resp:
                 data = json.loads(resp.read())
         except urllib.error.HTTPError as err:
             body = ""
@@ -222,7 +229,7 @@ class ZephyrCloud:
             client_id="ha-zephyr-" + uuid.uuid4().hex[:10],
             transport="websockets",
         )
-        client.tls_set_context(self._ssl)
+        client.tls_set_context(self._ctx())
         client.ws_set_options(path=self._signed_ws_path())
         client.on_connect = self._on_connect
         client.on_message = self._on_message
