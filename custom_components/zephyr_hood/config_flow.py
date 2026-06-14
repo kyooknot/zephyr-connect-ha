@@ -37,9 +37,11 @@ class ZephyrHoodConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 await self.hass.async_add_executor_job(cloud.authenticate)
                 devices = await self.hass.async_add_executor_job(cloud.get_devices)
-            except ZephyrAuthError:
+            except ZephyrAuthError as err:
+                _LOGGER.warning("Zephyr authentication failed: %s", err)
                 errors["base"] = "invalid_auth"
-            except ZephyrApiError:
+            except ZephyrApiError as err:
+                _LOGGER.warning("Zephyr cloud connection failed: %s", err)
                 errors["base"] = "cannot_connect"
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Unexpected error validating Zephyr credentials")

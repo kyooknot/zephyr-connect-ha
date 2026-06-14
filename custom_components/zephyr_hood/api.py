@@ -18,6 +18,7 @@ import json
 import logging
 import ssl
 import threading
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -149,9 +150,16 @@ class ZephyrCloud:
             with urllib.request.urlopen(req, timeout=20, context=self._ssl) as resp:
                 data = json.loads(resp.read())
         except urllib.error.HTTPError as err:
-            raise ZephyrApiError(f"getowndevices HTTP {err.code}") from err
+            body = ""
+            try:
+                body = err.read().decode(errors="replace")[:300]
+            except Exception:  # noqa: BLE001
+                pass
+            raise ZephyrApiError(f"getowndevices HTTP {err.code}: {body}") from err
         except Exception as err:
-            raise ZephyrApiError(f"getowndevices failed: {err}") from err
+            raise ZephyrApiError(
+                f"getowndevices failed: {type(err).__name__}: {err}"
+            ) from err
         return data.get("devices", [])
 
     # ------------------------------------------- SigV4 presigned WS path ------
