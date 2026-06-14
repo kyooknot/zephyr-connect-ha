@@ -1,96 +1,106 @@
-"""Sensor platform for Zephyr Hood."""
+"""Sensor platform for the Zephyr Hood integration."""
 from __future__ import annotations
 
-import logging
+from dataclasses import dataclass
 
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.components.sensor import (
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN
+from .entity import ZephyrEntity
 
-_LOGGER = logging.getLogger(__name__)
+
+@dataclass(frozen=True, kw_only=True)
+class ZephyrSensorDescription:
+    key: str
+    name: str
+    field: str
+    icon: str | None = None
+
+
+# Cumulative runtime counters reported by the hood, in minutes.
+USAGE_SENSORS: tuple[ZephyrSensorDescription, ...] = (
+    ZephyrSensorDescription(
+        key="grease_filter_usage",
+        name="Grease filter usage",
+        field="usegreasefiltertime",
+        icon="mdi:air-filter",
+    ),
+    ZephyrSensorDescription(
+        key="charcoal_filter_usage",
+        name="Charcoal filter usage",
+        field="usecharcoalfiltertime",
+        icon="mdi:air-filter",
+    ),
+    ZephyrSensorDescription(
+        key="fan_runtime",
+        name="Fan runtime",
+        field="usefantime",
+        icon="mdi:fan-clock",
+    ),
+    ZephyrSensorDescription(
+        key="light_runtime",
+        name="Light runtime",
+        field="uselighttime",
+        icon="mdi:lightbulb-on-outline",
+    ),
+)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up Zephyr Hood sensor entities."""
-    data = hass.data[DOMAIN][entry.entry_id]
-    coordinator = data["coordinator"]
-    devices = data["devices"]
-
-    entities = []
-    for device in devices:
-        entities.append(ZephyrHoodFilterSensor(coordinator, device))
-        entities.append(ZephyrHoodFanSpeedSensor(coordinator, device))
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    entities: list[SensorEntity] = []
+    for thing in coordinator.devices:
+        entities.extend(ZephyrUsageSensor(coordinator, thing, desc) for desc in USAGE_SENSORS)
+        entities.append(ZephyrFaultSensor(coordinator, thing))
     async_add_entities(entities)
 
 
-class ZephyrHoodBaseSensor(CoordinatorEntity, SensorEntity):
-    """Base class for Zephyr Hood sensors."""
+class ZephyrUsageSensor(ZephyrEntity, SensorEntity):
+    """A cumulative runtime counter (filter life / fan / light hours)."""
 
-    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
 
-    def __init__(self, coordinator, device: dict) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator)
-        self._device = device
-        self._device_id = device.get("id") or device.get("device_id")
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._device.get("name", "Zephyr Hood"),
-            manufacturer=MANUFACTURER,
-            model=self._device.get("model", "Lux Connect"),
-        )
+    def __init__(self, coordinator, thing: str, desc: ZephyrSensorDescription) -> None:
+        super().__init__(coordinator, thing)
+        self._desc = desc
+        self._attr_name = desc.name
+        self._attr_icon = desc.icon
+        self._attr_unique_id = f"{thing}_{desc.key}"
 
     @property
-    def _status(self) -> dict:
-        """Return current device status from coordinator."""
-        return self.coordinator.data.get("statuses", {}).get(self._device_id, {})
+    def native_value(self) -> int | None:
+        value = self._reported.get(self._desc.field)
+        return None if value is None else int(value)
 
 
-class ZephyrHoodFilterSensor(ZephyrHoodBaseSensor):
-    """Sensor for filter status."""
+class ZephyrFaultSensor(ZephyrEntity, SensorEntity):
+    """Reported fault code(s); 'OK' when the hood reports none."""
 
-    _attr_name = "Filter Status"
-    _attr_icon = "mdi:air-filter"
+    _attr_name = "Fault code"
+    _attr_icon = "mdi:alert-circle-outline"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator, device: dict) -> None:
-        """Initialize filter sensor."""
-        super().__init__(coordinator, device)
-        self._attr_unique_id = f"{self._device_id}_filter_status"
-
-    @property
-    def native_value(self) -> str:
-        """Return filter status."""
-        # TODO: Update key after traffic analysis
-        return self._status.get("filter_status", "unknown")
-
-
-class ZephyrHoodFanSpeedSensor(ZephyrHoodBaseSensor):
-    """Sensor showing current fan speed as a number."""
-
-    _attr_name = "Fan Speed"
-    _attr_icon = "mdi:fan"
-    _attr_native_unit_of_measurement = "speed"
-
-    def __init__(self, coordinator, device: dict) -> None:
-        """Initialize fan speed sensor."""
-        super().__init__(coordinator, device)
-        self._attr_unique_id = f"{self._device_id}_fan_speed"
+    def __init__(self, coordinator, thing: str) -> None:
+        super().__init__(coordinator, thing)
+        self._attr_unique_id = f"{thing}_fault_code"
 
     @property
-    def native_value(self) -> int:
-        """Return current fan speed (0-6)."""
-        # TODO: Update key after traffic analysis
-        return int(self._status.get("fan_speed", 0))
+    def native_value(self) -> str | None:
+        fault = self._reported.get("faultCode")
+        if fault is None:
+            return None
+        if isinstance(fault, (list, tuple)):
+            return ", ".join(str(f) for f in fault) if fault else "OK"
+        return "OK" if fault in (0, "0", "") else str(fault)

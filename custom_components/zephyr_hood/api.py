@@ -18,7 +18,6 @@ import json
 import logging
 import ssl
 import threading
-import time
 import urllib.parse
 import urllib.request
 import uuid
@@ -39,8 +38,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-_CREDS_TTL = 45 * 60  # refresh AWS creds well before their ~60 min expiry
 
 
 class ZephyrAuthError(Exception):

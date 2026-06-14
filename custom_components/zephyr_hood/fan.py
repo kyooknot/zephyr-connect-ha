@@ -1,108 +1,72 @@
-"""Fan platform for Zephyr Hood."""
+"""Fan platform for the Zephyr Hood integration (blower)."""
 from __future__ import annotations
 
-import logging
 import math
 from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, FAN_SPEED_MAX, FAN_SPEED_MIN, MANUFACTURER
-
-_LOGGER = logging.getLogger(__name__)
+from .const import CTRL_FAN, DEFAULT_MAX_FAN, DOMAIN
+from .entity import ZephyrEntity
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up Zephyr Hood fan entities."""
-    data = hass.data[DOMAIN][entry.entry_id]
-    coordinator = data["coordinator"]
-    api = data["api"]
-    devices = data["devices"]
-
-    async_add_entities(
-        ZephyrHoodFan(coordinator, api, device) for device in devices
-    )
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities(ZephyrFan(coordinator, thing) for thing in coordinator.devices)
 
 
-class ZephyrHoodFan(CoordinatorEntity, FanEntity):
-    """Representation of a Zephyr Hood fan."""
+class ZephyrFan(ZephyrEntity, FanEntity):
+    """The hood blower — the device's primary entity."""
 
-    _attr_has_entity_name = True
-    _attr_name = "Fan"
+    _attr_name = None  # primary entity inherits the device name
     _attr_supported_features = (
-        FanEntityFeature.SET_SPEED | FanEntityFeature.TURN_OFF | FanEntityFeature.TURN_ON
+        FanEntityFeature.SET_SPEED
+        | FanEntityFeature.TURN_ON
+        | FanEntityFeature.TURN_OFF
     )
 
-    def __init__(self, coordinator, api, device: dict) -> None:
-        """Initialize the fan entity."""
-        super().__init__(coordinator)
-        self._api = api
-        self._device = device
-        self._device_id = device.get("id") or device.get("device_id")
-        self._attr_unique_id = f"{self._device_id}_fan"
+    def __init__(self, coordinator, thing: str) -> None:
+        super().__init__(coordinator, thing)
+        self._attr_unique_id = f"{thing}_fan"
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._device.get("name", "Zephyr Hood"),
-            manufacturer=MANUFACTURER,
-            model=self._device.get("model", "Lux Connect"),
-        )
-
-    @property
-    def _status(self) -> dict:
-        """Return current device status from coordinator."""
-        return self.coordinator.data.get("statuses", {}).get(self._device_id, {})
-
-    @property
-    def is_on(self) -> bool:
-        """Return true if fan is on."""
-        # TODO: Update key after traffic analysis
-        speed = self._status.get("fan_speed", 0)
-        return int(speed) > 0
-
-    @property
-    def percentage(self) -> int | None:
-        """Return current speed as a percentage."""
-        speed = int(self._status.get("fan_speed", 0))
-        if speed == 0:
-            return 0
-        return math.ceil((speed / FAN_SPEED_MAX) * 100)
+    def _max(self) -> int:
+        return int(self._reported.get("maxFanSpeed") or DEFAULT_MAX_FAN)
 
     @property
     def speed_count(self) -> int:
-        """Return number of speeds."""
-        return FAN_SPEED_MAX
+        return self._max
 
-    async def async_turn_on(self, percentage: int | None = None, **kwargs: Any) -> None:
-        """Turn on the fan."""
-        speed = FAN_SPEED_MIN
-        if percentage:
-            speed = max(FAN_SPEED_MIN, math.ceil((percentage / 100) * FAN_SPEED_MAX))
-        await self._api.set_fan_speed(self._device_id, speed)
-        await self.coordinator.async_request_refresh()
+    @property
+    def is_on(self) -> bool:
+        return int(self._reported.get(CTRL_FAN, 0) or 0) > 0
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn off the fan."""
-        await self._api.set_fan_speed(self._device_id, 0)
-        await self.coordinator.async_request_refresh()
+    @property
+    def percentage(self) -> int:
+        speed = int(self._reported.get(CTRL_FAN, 0) or 0)
+        if speed <= 0:
+            return 0
+        return min(100, round(speed / self._max * 100))
 
     async def async_set_percentage(self, percentage: int) -> None:
-        """Set fan speed by percentage."""
-        if percentage == 0:
-            await self.async_turn_off()
-            return
-        speed = max(FAN_SPEED_MIN, math.ceil((percentage / 100) * FAN_SPEED_MAX))
-        await self._api.set_fan_speed(self._device_id, speed)
-        await self.coordinator.async_request_refresh()
+        speed = 0 if percentage == 0 else max(1, math.ceil(percentage / 100 * self._max))
+        await self._async_set(CTRL_FAN, speed)
+
+    async def async_turn_on(
+        self,
+        percentage: int | None = None,
+        preset_mode: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if percentage:
+            await self.async_set_percentage(percentage)
+        else:
+            await self._async_set(CTRL_FAN, 1)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._async_set(CTRL_FAN, 0)
