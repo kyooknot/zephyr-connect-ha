@@ -21,9 +21,9 @@ async def async_setup_entry(
 
 
 class ZephyrFan(ZephyrEntity, FanEntity):
-    """The hood blower — the device's primary entity."""
+    """The hood blower."""
 
-    _attr_name = None  # primary entity inherits the device name
+    _attr_name = "Fan"
     _attr_supported_features = (
         FanEntityFeature.SET_SPEED
         | FanEntityFeature.TURN_ON
