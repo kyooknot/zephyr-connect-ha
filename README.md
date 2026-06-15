@@ -62,6 +62,29 @@ Connect app and are required for sign-in to work. They are **not** account
 secrets; you still authenticate with your personal email and password, which are
 stored only in your Home Assistant config entry.
 
+## Security & privacy
+
+- **Your credentials stay in your HA.** Your Zephyr email/password live in the
+  config entry (HA's encrypted `.storage`) and are sent only to Zephyr's own
+  Cognito sign-in — never to this project or any third party. No secrets
+  (credentials, tokens, or the signed MQTT URL) are written to the log.
+- **The `const.py` AWS IDs/secret are not yours.** They're the public app's own
+  configuration, identical in every APK, required for Cognito `SECRET_HASH`
+  sign-in. They identify the shared Zephyr backend, not an account.
+- **TLS stays verified.** Chain + hostname verification remain on (anchored to
+  `certifi`); only the strict X.509 *Subject Key Identifier* check is relaxed for
+  the Zephyr/Gemtek API cert, which omits that extension. Validation is **not**
+  disabled.
+- **Data stays local.** The integration talks only to the same Zephyr/Gemtek and
+  AWS IoT endpoints the official app uses. Everything runs inside your HA; there
+  is no extra telemetry.
+- **Unofficial & cloud-dependent.** Built by reverse-engineering the public app;
+  not affiliated with or endorsed by Zephyr. It uses undocumented endpoints and
+  could break if Zephyr changes its backend.
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and log-scrubbing
+guidance.
+
 ## Credits
 
 Community integration, not affiliated with or endorsed by Zephyr. Built by
