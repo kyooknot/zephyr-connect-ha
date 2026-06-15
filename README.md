@@ -19,14 +19,16 @@ wall control or the app show up in Home Assistant immediately (no polling).
 | `switch` | Recirculating mode | Ductless / recirculating toggle |
 | `switch` | Clean air | Periodic auto-ventilation function |
 | `number` | Delay off | Delayed shut-off timer (minutes) |
-| `sensor` | Grease / charcoal filter usage | Cumulative runtime counters |
-| `sensor` | Fan / light runtime | Cumulative runtime counters |
+| `sensor` | Grease / charcoal filter life | % of filter life remaining (100% fresh → 0% replace), matching the app |
+| `sensor` | Fan / light runtime | Cumulative on-time, minutes (diagnostic) |
 | `sensor` | Fault code | Reported hood fault(s), `OK` when clear |
 | `binary_sensor` | Online | Cloud connectivity (connectivity class) |
-| `binary_sensor` | Grease / charcoal filter | Needs cleaning/replacing (problem class) |
+| `binary_sensor` | Grease / charcoal filter | Needs cleaning — derived from usage ≥ 85% of max (problem class) |
+| `button` | Reset grease / charcoal filter | Clears the usage counter after you clean/replace a filter |
 
-> Available controls vary by model — entities populate from whatever fields your
-> hood reports.
+> Per-device maxes (fan speeds, light levels, filter life hours) are read from the
+> hood's `/discoverdevice` record; filter life and fan/light ranges are accurate
+> per model. Available controls otherwise populate from the hood's reported state.
 
 ## Installation
 
