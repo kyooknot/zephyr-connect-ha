@@ -85,7 +85,15 @@ stored only in your Home Assistant config entry.
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and log-scrubbing
 guidance.
 
-## Credits
+## Credits & acknowledgments
+
+This project began as a fork of
+[**Cows2Computers/zephyr-connect-ha**](https://github.com/Cows2Computers/zephyr-connect-ha)
+by Eric (Cows2Computers), which laid out the original integration scaffold and
+goal. The cloud backend (Cognito + AWS IoT Device Shadow) and the entity
+implementations in this release were built on top of that starting point. The
+original work is MIT-licensed and that copyright is retained in
+[LICENSE](LICENSE) — thank you for the head start.
 
 Community integration, not affiliated with or endorsed by Zephyr. Built by
 reverse-engineering the public app. Contributions welcome — please open an issue
