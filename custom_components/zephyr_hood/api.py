@@ -179,6 +179,30 @@ class ZephyrCloud:
             ) from err
         return data.get("devices", [])
 
+    def get_device_details(self, thing_name: str) -> dict[str, Any]:
+        """Return a hood's static capabilities via /discoverdevice.
+
+        Includes the authoritative per-device maxes (maxFanSpeed, maxLightLevel,
+        maxGreasefilterTimer, maxCharcoalfilterTimer) plus warranty/URL metadata.
+        """
+        self._ensure_token()
+        req = urllib.request.Request(
+            f"{APP_API_BASE_URL}/discoverdevice",
+            data=json.dumps({"thingName": thing_name}).encode(),
+            method="POST",
+            headers={
+                "Authorization": self._cognito.id_token,
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20, context=self._ctx()) as resp:
+                return json.loads(resp.read())
+        except Exception as err:
+            raise ZephyrApiError(
+                f"discoverdevice failed: {type(err).__name__}: {err}"
+            ) from err
+
     # ------------------------------------------- SigV4 presigned WS path ------
     def _signed_ws_path(self) -> str:
         creds = self._aws_credentials()

@@ -32,7 +32,11 @@ class ZephyrLight(ZephyrEntity, LightEntity):
 
     @property
     def _max(self) -> int:
-        return int(self._reported.get("maxLightLevel") or DEFAULT_MAX_LIGHT)
+        return int(
+            self._device.get("maxLightLevel")
+            or self._reported.get("maxLightLevel")
+            or DEFAULT_MAX_LIGHT
+        )
 
     @property
     def is_on(self) -> bool:

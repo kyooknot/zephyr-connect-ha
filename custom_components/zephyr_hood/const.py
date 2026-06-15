@@ -36,9 +36,23 @@ CTRL_CLEANAIR = "setcleanairfunction"
 CTRL_RESET_GREASE = "resetgreasefilter"
 CTRL_RESET_CHARCOAL = "resetcharcoalfilter"
 
-# Capability fallbacks (the shadow reports max* fields when the hood is online)
+# Capability fallbacks. The real per-device maxes come from the /discoverdevice
+# API (maxFanSpeed/maxLightLevel/maxGreasefilterTimer/maxCharcoalfilterTimer) and
+# are merged onto each device dict at setup; these apply only if that call fails.
 DEFAULT_MAX_FAN = 6
 DEFAULT_MAX_LIGHT = 3
 DEFAULT_MAX_DELAY = 10  # minutes
+DEFAULT_MAX_GREASE_HOURS = 60
+DEFAULT_MAX_CHARCOAL_HOURS = 200
 
-PLATFORMS = ["fan", "light", "switch", "number", "sensor", "binary_sensor"]
+# Device-detail keys (from /discoverdevice) merged onto the device dict.
+KEY_MAX_FAN = "maxFanSpeed"
+KEY_MAX_LIGHT = "maxLightLevel"
+KEY_MAX_GREASE = "maxGreasefilterTimer"
+KEY_MAX_CHARCOAL = "maxCharcoalfilterTimer"
+
+# The app flags a filter as "needs cleaning" once usage reaches this fraction of
+# its max life (Hood.isGreaseFilterNeedReplace / isCharcoalFilterNeedReplace).
+FILTER_REPLACE_FRACTION = 0.85
+
+PLATFORMS = ["fan", "light", "switch", "number", "sensor", "binary_sensor", "button"]

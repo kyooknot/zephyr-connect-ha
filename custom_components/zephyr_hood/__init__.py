@@ -53,6 +53,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not devices:
         raise ConfigEntryNotReady("No Zephyr hoods are bound to this account")
 
+    # Merge each hood's static capabilities (authoritative per-device maxes) from
+    # /discoverdevice. Non-fatal: entities fall back to sensible defaults if it fails.
+    for device in devices:
+        thing = device.get("thingName")
+        if not thing:
+            continue
+        try:
+            details = await hass.async_add_executor_job(cloud.get_device_details, thing)
+        except ZephyrApiError as err:
+            _LOGGER.debug("discoverdevice failed for %s: %s", thing, err)
+            continue
+        for key in ("maxFanSpeed", "maxLightLevel", "maxGreasefilterTimer", "maxCharcoalfilterTimer"):
+            if details.get(key) is not None:
+                device[key] = details[key]
+
     coordinator = ZephyrCoordinator(hass, cloud, devices)
 
     try:

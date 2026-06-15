@@ -36,7 +36,11 @@ class ZephyrFan(ZephyrEntity, FanEntity):
 
     @property
     def _max(self) -> int:
-        return int(self._reported.get("maxFanSpeed") or DEFAULT_MAX_FAN)
+        return int(
+            self._device.get("maxFanSpeed")
+            or self._reported.get("maxFanSpeed")
+            or DEFAULT_MAX_FAN
+        )
 
     @property
     def speed_count(self) -> int:
