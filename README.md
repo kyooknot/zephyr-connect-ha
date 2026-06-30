@@ -80,7 +80,9 @@ stored only in your Home Assistant config entry.
   is no extra telemetry.
 - **Unofficial & cloud-dependent.** Built by reverse-engineering the public app;
   not affiliated with or endorsed by Zephyr. It uses undocumented endpoints and
-  could break if Zephyr changes its backend.
+  could break if Zephyr changes its backend. The hood **cannot** be moved to a
+  local broker — it pins the AWS IoT server certificate and exposes no local
+  services (full TCP/UDP scan found nothing). See [docs/local-control.md](docs/local-control.md).
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and log-scrubbing
 guidance.
